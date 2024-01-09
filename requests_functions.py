@@ -43,12 +43,12 @@ def send_request(method, url, payload):
 
     logger.info(f"Получен ответ: {response.status_code}")
 
-    if response.status_code == 504:
-        time.sleep(5)
-        send_request(method, url, payload)
-        return None
-    else:
+    if response.status_code in [200, 401, 406]:
         return response
+
+    time.sleep(5)
+    send_request(method, url, payload)
+    return None
 
 
 def get_cookie():

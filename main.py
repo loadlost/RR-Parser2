@@ -11,12 +11,13 @@ from dataframe_functions import add_data_to_dataframe, clean_dataframe, save_to_
 from requests_functions import get_captcha, get_cookie, get_object_info
 
 from config import cad_numbers
+
 # Настройка логирования для отслеживания процесса выполнения скрипта
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
-def process_objects(cad_numbers):
+def process_objects(cadastral_numbers):
     # Функция обработки списка кадастровых номеров.
     # Для каждого номера осуществляется отправка запроса и обработка ответа.
     # Входные данные:
@@ -50,12 +51,12 @@ def process_objects(cad_numbers):
             logger.error(f"Не удалось выполнить запрос. Статус код: {response.status_code}")
             logger.error(response.text)
 
-    total_objects = len(cad_numbers)
+    total_objects = len(cadastral_numbers)
     logger.info(f"Начало обработки {total_objects} объектов.")
 
     # Получение куки для аутентификации и запуск обработки объектов.
     get_cookie()
-    for current_object, cadNumber in enumerate(cad_numbers, start=1):
+    for current_object, cadNumber in enumerate(cadastral_numbers, start=1):
         logger.info(f"Обработка объекта {current_object} из {total_objects} (КН: {cadNumber})...")
         process_loop(get_captcha())
 
@@ -66,7 +67,6 @@ def main():
     # Входные данные: отсутствуют.
     # Выходные данные: отсутствуют, но результаты работы сохраняются в файл Excel.
 
-    cad_numbers = []
     process_objects(cad_numbers)
     clean_dataframe()
     save_to_excel()
