@@ -38,7 +38,7 @@ def add_data_to_dataframe(response):
         for element in elements:
             data = add_to_dataframe(element)
             global result_df
-            result_df = result_df.append(data, ignore_index=True)
+            result_df = pd.concat([result_df, pd.DataFrame([data])], ignore_index=True)
     else:
         logger.warning("Объекты не найдены")
 
