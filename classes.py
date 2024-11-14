@@ -4,9 +4,9 @@ import logging
 from typing import Optional, Dict, Callable, Any, List
 
 import requests
-from python3_anticaptcha import ImageToTextTask
+from PIL import Image
+from captcha_recognizer.recognizer import CaptchaRecognizer
 
-from credentials import ANTICAPTCHA_KEY
 from format_data import format_rights, format_encumbrances
 
 logger = logging.getLogger(__name__)
@@ -269,7 +269,7 @@ class RequestConfig:
     def get_captcha_after_method(self, response: requests.Response) -> requests.Response:
         """
         Обрабатывает ответ, содержащий изображение капчи, сохраняет его локально,
-        отправляет на сервис распознавания и получает текст капчи.
+        распознает и получает текст капчи.
 
         Если распознавание капчи не удалось или капча неверная, метод
         повторяет запрос.
@@ -284,44 +284,39 @@ class RequestConfig:
             return self.execute(self.session)
 
         # Сохраняем изображение капчи в файл
-        with open('captcha.png', 'wb') as f:
+        captcha_file = 'captcha.png'
+        with open(captcha_file, 'wb') as f:
             f.write(response.content)
         logger.info("Captcha image saved as 'captcha.png'")
 
-        captcha_file: str = 'captcha.png'
+        # Создаем экземпляр распознавателя капчи
+        recognizer = CaptchaRecognizer()
 
         try:
-            # Отправляем капчу для распознавания
-            raw_result: Dict[str, Any] = ImageToTextTask.ImageToTextTask(
-                anticaptcha_key=ANTICAPTCHA_KEY
-            ).captcha_handler(captcha_file=captcha_file)
+            # Открываем файл изображения и передаем его в распознаватель
+            with Image.open(captcha_file) as img:
+                captcha_text = recognizer.predict(img)
 
-            logger.info(f"Raw result from captcha service: {raw_result}")
-
-            # Проверяем, если ответ от сервиса отсутствует
-            if not raw_result:
-                logger.info("Raw result is None, retrying captcha request.")
+            # Проверка на пустой результат распознавания
+            if not captcha_text:
+                logger.info("Captcha recognition failed, retrying captcha request.")
                 return self.execute(self.session)
 
-            # Проверяем наличие ошибок в ответе от сервиса
-            if raw_result.get('errorId') != 0:
-                error_code: str = raw_result.get('errorCode')
-                error_description: str = raw_result.get('errorDescription')
-                logger.error(f"Captcha recognition error: {error_code} - {error_description}")
-                return self.execute(self.session)
+            logger.info(f"Captcha text obtained: {captcha_text}")
 
-        except requests.exceptions.RequestException as e:
+            # Сохраняем распознанный текст капчи
+            RequestConfig.captcha = captcha_text
+
+        except RuntimeError as e:
             logger.error(f"Exception during captcha processing: {e}")
             raise e
-
-        # Сохраняем распознанный текст капчи
-        RequestConfig.captcha = raw_result.get('solution').get('text')
-        logger.info(f"Captcha text obtained: {RequestConfig.captcha}")
 
         # Проверяем правильность капчи
         if not self._test_captcha():
             logger.info("Captcha verification failed, retrying.")
             return self.execute(self.session)
+
+        return response  # Возвращаем ответ при успешной верификации капчи
 
     def _test_captcha(self) -> bool:
         """
